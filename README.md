@@ -23,6 +23,29 @@ This strategy is a classic Donchian-style Trend Following system based on struct
 ![Strategy Visualization](strategy_chart.png)
 [Image of a candlestick chart showing pivot high/low points, a 50-period moving average, and highlighted trade entry/exit zones]
 
+## 🔴 Live Execution (Paper Trading)
+
+The project includes a `live_trader.py` script designed for real-time automated trading using the Interactive Brokers Paper Trading account.
+
+### Workflow
+1. **Warm-up**: On startup, the script retrieves the last 2 days of 5-minute candles to "warm up" the 50 SMA and Pivot indicators.
+2. **Event-Driven**: The script subscribes to live 5-minute bar updates.
+3. **Execution**: Logic is evaluated only at the close of each candle to prevent "ghost signals" mid-bar.
+4. **Order Management**: Automatically detects existing positions via the API to prevent duplicate entries.
+
+
+
+### Running the Live Trader
+Ensure TWS or IB Gateway is running and logged into a **Paper Trading** account (indicated by a red login header).
+```bash
+python live_trader.py
+```
+## ⚠️ Risk Warning & Safety
+* **Paper Trading First**: Always run this script on a paper account for at least one full week to verify execution logic before even considering a live account.
+
+* **Slippage**: Live market orders may execute at prices slightly different from the candle close used in backtests.
+
+* **Connectivity**: The script requires a stable internet connection. If the connection drops, ib-insync will attempt to reconnect, but market opportunities may be missed.
 ## 🛠 Tech Stack
 
 * **Language**: Python 3.11
