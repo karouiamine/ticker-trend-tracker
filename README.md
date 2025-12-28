@@ -20,6 +20,7 @@ This strategy is a classic Donchian-style Trend Following system based on struct
 * **The Trend Filter**: To avoid "fakeouts" during bear markets or choppy sideways action, it uses a Moving Average (SMA/EMA 50). You only take a breakout trade if the price is currently above this MA.
 * **Exit (Trailing Stop)**: Instead of a fixed target, the strategy uses the most recent Swing Low as a dynamic stop loss. As the market moves higher and creates new "higher lows," the stop loss moves up automatically. You stay in the trade until a swing low is breached.
 
+![Strategy Visualization](strategy_chart.png)
 [Image of a candlestick chart showing pivot high/low points, a 50-period moving average, and highlighted trade entry/exit zones]
 
 ## 🛠 Tech Stack
@@ -40,8 +41,9 @@ This strategy is a classic Donchian-style Trend Following system based on struct
 ### 2. Launch the Data Pipeline
 ```bash
 docker-compose up --build
-The collector will start backfilling Friday's data and then enter a real-time loop.
 ```
+The collector will start backfilling Friday's data and then enter a real-time loop.
+
 
 ### 3. Run the Backtest
 Run this on your host machine to analyze the collected data:
