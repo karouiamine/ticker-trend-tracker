@@ -48,7 +48,7 @@ Run this on your host machine to analyze the collected data:
 
 ```bash
 pip install pandas sqlalchemy psycopg2-binary
-python backtest_5m.py
+python backtest.py
 ```
 
 ## ⚠️ Important Notes on Pacing
