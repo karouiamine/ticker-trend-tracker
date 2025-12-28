@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: marketdata_postgres
+    environment:
+      POSTGRES_DB: marketdata
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: laminenba
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+  collector:
+    build: ./collector
+    container_name: ibkr_collector
+    environment:
+      PYTHONUNBUFFERED: 1  # Forces prints to show up instantly
+      IB_HOST: host.docker.internal
+      IB_PORT: 7496
+      IB_CLIENT_ID: 21
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: marketdata
+      DB_USER: trader
+      DB_PASS: laminenba
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS spy_ohlc_1s (
+    ts TIMESTAMPTZ NOT NULL,
+    symbol TEXT NOT NULL,
+    open DOUBLE PRECISION NOT NULL,
+    high DOUBLE PRECISION NOT NULL,
+    low DOUBLE PRECISION NOT NULL,
+    close DOUBLE PRECISION NOT NULL,
+    volume BIGINT NOT NULL,
+    PRIMARY KEY (ts)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spy_ohlc_1s_ts
+    ON spy_ohlc_1s (ts);

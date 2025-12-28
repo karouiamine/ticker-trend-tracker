@@ -1,0 +1,30 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+
+# --- Database & Persistence ---
+# Exclude the actual postgres data directory if it's mapped locally
+pgdata/
+*.sql.gz
+*.sql.tar
+
+# --- IDEs & Editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# --- Logs & Results ---
+*.log
+backtest_results_5m.csv
+backtest_results_1s.csv
+
+# --- Repomix ---
+# Exclude the tool output if you used it to pack the repo
+repomix-output.xml
