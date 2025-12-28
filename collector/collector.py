@@ -208,6 +208,69 @@ def backfill_in_chunks(ib, contract, total_days=1):
             else:
                 print(f"  Error in chunk: {e}")
                 current_end -= chunk_size # Skip failed chunk
+
+def backfill_entire_week(ib, contract, weeks_back=1):
+    # Set target to Friday Close (9 PM UTC)
+    end_date = datetime(2025, 12, 26, 21, 0, 0, tzinfo=timezone.utc)
+    start_date = end_date - timedelta(days=7 * weeks_back)
+    
+    current_cursor = end_date
+    chunk_size = timedelta(minutes=30)
+
+    print(f"Starting Smart Backfill from {end_date} backwards...")
+
+    while current_cursor > start_date:
+        # 1. Skip Weekends (Saturday=5, Sunday=6)
+        if current_cursor.weekday() >= 5:
+            print(f"Weekend detected. Jumping to Friday close.")
+            current_cursor = current_cursor.replace(hour=21, minute=0, second=0) - timedelta(days=current_cursor.weekday() - 4)
+            continue
+
+        # 2. Skip Overnight Hours (If cursor is before 14:30 UTC, jump to previous day 21:00 UTC)
+        # UTC 14:30 is 9:30 AM EST
+        if current_cursor.hour < 14 or (current_cursor.hour == 14 and current_cursor.minute < 30):
+            print(f"Market closed ({current_cursor.time()} UTC). Jumping to previous day close.")
+            current_cursor = (current_cursor - timedelta(days=1)).replace(hour=21, minute=0, second=0)
+            continue
+
+        formatted_end = current_cursor.strftime('%Y%m%d %H:%M:%S')
+        print(f"Requesting RTH chunk ending at: {formatted_end} UTC")
+
+        try:
+            bars = ib.reqHistoricalData(
+                contract,
+                endDateTime=formatted_end,
+                durationStr='1800 S', 
+                barSizeSetting='1 secs',
+                whatToShow='TRADES',
+                useRTH=True, # API will still double-check RTH for us
+                formatDate=1
+            )
+
+            if bars:
+                save_bars(bars)
+                # Success: Move cursor back by the exact amount we just downloaded
+                current_cursor -= chunk_size
+                print(f"  Saved {len(bars)} bars. Cursor now at {current_cursor}")
+            else:
+                # If no data, the market was likely closed (Holiday like Dec 25)
+                # Jump back one day to keep the loop moving
+                print(f"  No data for {formatted_end}. Jumping back 1 day.")
+                current_cursor = (current_cursor - timedelta(days=1)).replace(hour=21, minute=0, second=0)
+
+            # Pacing Protection
+            time.sleep(12) 
+
+        except Exception as e:
+            if "162" in str(e):
+                print("Pacing violation! Sleeping 5 mins...")
+                time.sleep(300)
+            else:
+                print(f"Error: {e}")
+                current_cursor -= chunk_size
+
+    print("Weekly backfill complete!")
+
 def save_bars(bars):
     """Helper to format and insert bars into Postgres."""
     rows = [
@@ -240,7 +303,8 @@ try:
     ib.qualifyContracts(contract)
     print("Contract qualified")
     # Run Chunked Backfill
-    backfill_in_chunks(ib, contract, total_days=1)
+    #backfill_in_chunks(ib, contract, total_days=1)
+    backfill_entire_week(ib, contract, weeks_back=1)
     
     print("Backfill process finished. Entering live loop...")
     

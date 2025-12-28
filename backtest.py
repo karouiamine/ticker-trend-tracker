@@ -1,79 +1,65 @@
 import pandas as pd
-import psycopg2
+from sqlalchemy import create_engine
 from strategy.engine import BreakoutStrategy
 
-# Database Connection
-DB_CONFIG = {
-    "host": "localhost", # Change to 'postgres' if running inside Docker
-    "dbname": "marketdata",
-    "user": "trader",
-    "password": "laminenba"
-}
+# Connection
+engine = create_engine("postgresql://trader:laminenba@localhost:5432/marketdata")
 
-def load_and_resample(timeframe='5min'):
-    conn = psycopg2.connect(**DB_CONFIG)
-    print(f"Loading 1s data and resampling to {timeframe}...")
-    
-    # 1. Load the raw 1-second data
-    query = "SELECT ts, open, high, low, close, volume FROM spy_ohlc_1s ORDER BY ts ASC;"
-    df = pd.read_sql(query, conn)
-    
-    # Ensure 'ts' is the index for resampling
+def run_5m_backtest():
+    # 1. Load 1s data
+    print("Fetching data...")
+    df = pd.read_sql("SELECT ts, open, high, low, close, volume FROM spy_ohlc_1s ORDER BY ts ASC", engine)
+    if df.empty: 
+        print("No data found!")
+        return
+
     df['ts'] = pd.to_datetime(df['ts'])
     df.set_index('ts', inplace=True)
-    
-    # 2. Resample to OHLCV candles
-    # '5min' or '5T' groups the data into 5-minute blocks
-    resampled_df = df.resample(timeframe).agg({
-        'open': 'first',
-        'high': 'max',
-        'low': 'min',
-        'close': 'last',
-        'volume': 'sum'
-    })
-    
-    # Remove any empty candles (e.g., if there was no trading in a 5m block)
-    resampled_df.dropna(subset=['close'], inplace=True)
-    print(f"Resampled {len(df)} 1s-rows into {len(resampled_df)} {timeframe}-candles.")
-    # Reset index to make 'ts' a column again for the strategy engine
-    return resampled_df.reset_index()
 
-def run_backtest():
-    # Load data at 5-minute resolution
-    df_5m = load_and_resample('5min')
-    # Use the BreakoutStrategy Class
-    # Note: On 5m candles, you might want to adjust pvt_len or ma_period
-    strat = BreakoutStrategy(ma_period=50, pvt_len=2, stop_buffer_pct=0.0005)
-    df_signals = strat.generate_signals(df_5m)
+    # 2. Resample to 5 Minutes
+    print("Resampling to 5m candles...")
+    df_5m = df.resample('5min').agg({
+        'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+    }).dropna().reset_index()
 
-    in_position = False
-    entry_price = 0
+    # 3. Apply Strategy
+    strat = BreakoutStrategy(ma_period=50, pvt_len=3, stop_buffer_pct=0.0005)
+    df_results = strat.generate_signals(df_5m)
+
+    # 4. Trade Simulation
     trades = []
+    in_pos = False
+    entry_data = {}
 
-    for i in range(len(df_signals)):
-        row = df_signals.iloc[i]
-        
-        if not in_position and row['buy_signal']:
-            in_position = True
-            entry_price = row['close']
-            entry_time = row['ts']
-        
-        elif in_position and row['sell_signal']:
-            in_position = False
-            pnl = row['close'] - entry_price
+    for i, row in df_results.iterrows():
+        if not in_pos and row['buy_signal']:
+            in_pos = True
+            entry_data = {'price': row['close'], 'time': row['ts']}
+        elif in_pos and row['sell_signal']:
+            in_pos = False
+            pnl = row['close'] - entry_data['price']
             trades.append({
-                'entry_time': entry_time,
+                'entry_time': entry_data['time'],
                 'exit_time': row['ts'],
-                'pnl': pnl,
-                'return': (pnl / entry_price) * 100
+                'entry_price': entry_data['price'],
+                'exit_price': row['close'],
+                'return_pct': (pnl / entry_data['price']) * 100
             })
 
-    results = pd.DataFrame(trades)
+    # 5. Output
+    report = pd.DataFrame(trades)
+    if not report.empty:
+        print(f"\n--- Backtest Results (5m) ---")
+        print(f"Total Trades: {len(report)}")
+        print(f"Win Rate: {(report['return_pct'] > 0).mean():.2%}")
+        print(f"Total Return: {report['return_pct'].sum():.2%}")
+        print(report.tail())
+    else:
+        print("No trades executed with current parameters.")
+
     
     # Export for inspection
-    results.to_csv('backtest_results_5m.csv', index=False)
-    return results
-
-# Execute
-trade_results = run_backtest()
-print(trade_results)
+    report.to_csv('backtest_results_5m.csv', index=False)
+    
+if __name__ == "__main__":
+    run_5m_backtest()
